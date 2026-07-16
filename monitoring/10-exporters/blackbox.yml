@@ -1,0 +1,18 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      preferred_ip_protocol: "ip4"
+      follow_redirects: true
+      fail_if_not_ssl: false
+      tls_config:
+        insecure_skip_verify: true
+
+##
+# blackbox
+## 
+
+# blackbox.yml: https://github.com/prometheus/blackbox_exporter/blob/master/blackbox.yml
+# https://grafana.com/blog/how-we-eliminated-service-outages-from-certificate-expired-by-setting-up-alerts-with-grafana-and-prometheus/

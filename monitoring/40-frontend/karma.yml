@@ -1,0 +1,35 @@
+alertmanager:
+  interval: 10s
+  servers:
+    - name: "local-alertmanager"
+      uri: "http://127.0.0.1:9093"
+      proxy: true
+
+# Настройки отображения ярлыков
+labels:
+  # Раскрашиваем важность алертов в правильные цвета
+  color:
+    custom:
+      severity:
+        - value: critical
+          color: "#ff220c" # Красный
+        - value: warning
+          color: "#ffae42" # Оранжевый
+        - value: info
+          color: "#87c4e0" # Голубой
+  # Сортировка ярлыков слева направо, чтобы самое важное было перед глазами
+  order:
+    - alertname
+    - project_name
+    - severity
+    - instance
+    - job
+
+# Настройки самого интерфейса
+ui:
+  theme: dark
+  refresh: 5s
+  # Разбивает интерфейс на отдельные блоки по проектам
+  multiGridLabel: "project_name" 
+  # Сколько алертов показывать в одной группе до появления кнопки "показать еще"
+  alertsPerGroup: 10 

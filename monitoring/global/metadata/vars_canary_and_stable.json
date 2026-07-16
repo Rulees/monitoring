@@ -1,0 +1,44 @@
+{
+  "title": "Canary & Stable Dashboard",
+  "uid": "canary-stable-overview",
+  "editable": true,
+  "graphTooltip": 0,
+  "panels": [],
+  "refresh": "5s",
+  "schemaVersion": 30,
+  "style": "dark",
+  "tags": ["canary", "deployment"],
+  "timezone": "browser",
+  "templating": {
+    "list": [
+      {
+        "name": "stable_hash",
+        "label": "Stable Version",
+        "description": "Hash of the current Stable version",
+        "type": "query",
+        "datasource": "Prometheus",
+        "definition": "label_values(deploy_role_map{role=\"stable\"}, version)",
+        "query": "label_values(deploy_role_map{role=\"stable\"}, version)",
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "canary_hash",
+        "label": "Canary Version",
+        "description": "Hash of the current Canary version",
+        "type": "query",
+        "datasource": "Prometheus",
+        "definition": "label_values(deploy_role_map{role=\"canary\"}, version)",
+        "query": "label_values(deploy_role_map{role=\"canary\"}, version)",
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "multi": false,
+        "includeAll": false
+      }
+    ]
+  }
+}

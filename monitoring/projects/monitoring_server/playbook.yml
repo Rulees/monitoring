@@ -1,0 +1,30 @@
+---
+- name: Установка серверной части мониторинга
+  hosts: monitoring_server
+  become: true
+  pre_tasks:
+    - name: Debug configured variables
+      debug:
+        var: "{{ item }}"
+      failed_when: lookup('vars', item, default='') | length == 0
+      loop:
+        - work_dir
+        - monitoring_config_dir
+        - MONITORING_SERVER_IP
+
+  roles:
+    # - amnezia_vpn
+    - docker_install
+    - role: monitoring
+      vars:
+        enable_promtail: true
+        enable_node_exporter: true
+        enable_vmagent: true
+        enable_prometheus: true
+        enable_loki: true
+        enable_grafana: true            # дашборды
+        enable_blackbox_exporter: true  # https expire, ports check
+        enable_domain_exporter: true    # domain expire
+        enable_alertmanager: true       # уведомления
+
+        enable_karma: true              # gui для создания алёртов

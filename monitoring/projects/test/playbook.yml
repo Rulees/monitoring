@@ -1,0 +1,29 @@
+---
+- name: Установка агентов для сбора логов/метрик
+  hosts: monitoring_client
+  become: true
+  tasks:
+    - name: Debug configured variables
+      debug:
+        var: "{{ item }}"
+      failed_when: lookup('vars', item, default='') | length == 0
+      loop:
+        - work_dir
+        - monitoring_config_dir
+        - MONITORING_SERVER_IP
+
+    - block:
+            - import_role: {name: docker_install}
+            
+            ##
+            # MONITORING
+            ##
+
+            - import_role: {name: monitoring}
+              vars:
+                            enable_promtail: true         # для логов
+                            enable_node_exporter: true    # для метрик
+                            enable_blackbox_exporter: true  # https expire, ports check
+                            enable_domain_exporter: true    # domain expire
+
+

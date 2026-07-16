@@ -1,0 +1,12 @@
+groups:
+- name: vm-availability
+  rules:
+    - alert: VMDown
+      expr: up == 0
+      for: 1m
+      labels:
+        severity: 'critical'
+      annotations:
+        summary: "Сервер проекта {{ $labels.project_name }} недоступен!"
+        description: "Виртуальная машина (IP: {{ $labels.instance }}) из проекта {{ $labels.project }} недоступна более 1 минуты."
+        value: "{{ $value }}"

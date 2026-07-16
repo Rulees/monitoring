@@ -1,0 +1,50 @@
+global:
+  resolve_timeout: 20s
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+
+route:
+  receiver: 'telegram'
+  group_by: ['alertname']
+  group_wait: 10s
+  # group_interval: 1m
+  # repeat_interval: 3h
+
+
+
+receivers:
+  - name: 'slack'
+    slack_configs:
+      - api_url: ''  # Slack Webhook URL
+        channel: '#all-arkselen'
+        send_resolved: true
+
+  - name: email
+    email_configs:
+      - to: "darkmelnik777@gmail.com"
+        from: "maxik257199@mail.ru"
+        smarthost: "smtp.example.com:587"
+        auth_username: "maxik257199@mail.ru"
+        auth_identity: "maxik257199@mail.ru"
+        auth_password: "ixPeuhf34yDUS2ixZPmM"
+
+  - name: 'telegram'
+    telegram_configs:
+      - api_url: 'https://api.telegram.org'
+        bot_token: '8937008115:AAEVnFWROxzGER82o-kgZgxIouyfoBzXHGw'
+        chat_id: -1004455722583                                               # id канала куда отправлять уведомления
+        parse_mode: 'HTML'
+        message: '{{ template "telegram.message" . }}'
+        send_resolved: true
+
+
+  - name: 'b24'
+    webhook_configs:
+      # URL входящего вебхука, который ты сгенерируешь в Bitrix24
+      # Пример: https://твой_домен.bitrix24.ru/rest/1/токен/profile/
+      - url: 'https://your-domain.bitrix24.com/rest/1/your_webhook_token/im.notify.json'
+        send_resolved: true
+
+  - name: 'max'

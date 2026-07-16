@@ -1,0 +1,246 @@
+{
+  "uid": "service-health-wall-flat",
+  "title": "10 - All Services",
+  "schemaVersion": 39,
+  "version": 25,
+  "refresh": "30s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Service Health Wall",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 24, "w": 24, "x": 0, "y": 0 },
+
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "label_join(label_join(service_wall:cpu_pct, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+        },
+        {
+          "refId": "B",
+          "instant": true,
+          "expr": "label_join(label_join(service_wall:mem_pct, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+        },
+        {
+          "refId": "C",
+          "instant": true,
+          "expr": "label_join(label_join(service_wall:disk_free_pct, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+        },
+        {
+          "refId": "D",
+          "instant": true,
+          "expr": "label_join(label_join(service_wall:status, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+        },
+        {
+          "refId": "E",
+          "instant": true,
+          "expr": "label_join(label_join(service_wall:effective, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+        },
+        {
+          "refId": "F",
+          "instant": true,
+          "expr": "label_join(label_join(service_wall:n, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+        },
+        {
+          "refId": "G",
+          "instant": true,
+          "expr": "label_join(label_join(service_wall:bad, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+        }
+      ],
+
+      "transformations": [
+        {
+          "id": "joinByLabels",
+          "options": {
+            "join": ["ENV__APP__SERVICE---VERSION"],
+            "value": "__name__"
+          }
+        },
+
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "service_wall:cpu_pct": "CPU",
+              "service_wall:mem_pct": "MEM",
+              "service_wall:disk_free_pct": "DISK",
+              "service_wall:status": "S",
+              "service_wall:effective": "EFFECTIVE",
+              "service_wall:n": "N",
+              "service_wall:bad": "BAD"
+            }
+          }
+        },
+
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              { "field": "ENV__APP__SERVICE---VERSION", "desc": false },
+              { "field": "EFFECTIVE", "desc": true }
+            ]
+          }
+        },
+
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "__name__": true,
+              "Time": true,
+              "ENV__APP__SERVICE": true,
+              "EFFECTIVE": true
+            },
+            "indexByName": {
+              "S": 0,
+              "ENV__APP__SERVICE---VERSION": 1,
+              "CPU": 2,
+              "MEM": 3,
+              "DISK": 4,
+              "N": 5,
+              "BAD": 6
+            }
+          }
+        }
+      ],
+
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "custom": {
+            "align": "left",
+            "cellOptions": { "type": "color-background" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "S" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": { "text": "" },
+                      "2": { "text": "" },
+                      "3": { "text": "" },
+                      "4": { "text": "" }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": null, "color": "green" },
+                    { "value": 2, "color": "orange" },
+                    { "value": 3, "color": "red" },
+                    { "value": 4, "color": "dark-red" }
+                  ]
+                }
+              },
+              { "id": "custom.align", "value": "center" },
+              { "id": "custom.width", "value": 20 }
+            ]
+          },
+
+          {
+            "matcher": { "id": "byName", "options": "ENV__APP__SERVICE---VERSION" },
+            "properties": [
+              { "id": "custom.width", "value": 520 },
+              { "id": "custom.cellOptions", "value": { "type": "auto" } }
+            ]
+          },
+
+          {
+            "matcher": { "id": "byName", "options": "CPU" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.width", "value": 95 },
+              { "id": "custom.align", "value": "center" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": null, "color": "green" },
+                    { "value": 70, "color": "orange" },
+                    { "value": 85, "color": "red" }
+                  ]
+                }
+              }
+            ]
+          },
+
+          {
+            "matcher": { "id": "byName", "options": "MEM" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.width", "value": 95 },
+              { "id": "custom.align", "value": "center" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": null, "color": "green" },
+                    { "value": 70, "color": "orange" },
+                    { "value": 85, "color": "red" }
+                  ]
+                }
+              }
+            ]
+          },
+
+          {
+            "matcher": { "id": "byName", "options": "DISK" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.width", "value": 95 },
+              { "id": "custom.align", "value": "center" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "value": null, "color": "red" },
+                    { "value": 10, "color": "orange" },
+                    { "value": 20, "color": "green" }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "N" },
+            "properties": [
+              { "id": "custom.width", "value": 45 },
+              { "id": "custom.align", "value": "center" },
+              { "id": "custom.cellOptions", "value": { "type": "auto" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "BAD" },
+            "properties": [
+              { "id": "custom.width", "value": 55 },
+              { "id": "custom.align", "value": "center" },
+              { "id": "custom.cellOptions", "value": { "type": "auto" } }
+            ]
+          }
+        ]
+      },
+
+      "options": {
+        "showHeader": true,
+        "pagination": false,
+        "cellHeight": "sm"
+      }
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "uid": "service-details",
+  "title": "30 - CPU_MEM_DISK(time)",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "app",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(service_wall:status, app)"
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(service_wall:status{app=\"$app\"}, service)"
+      },
+      {
+        "name": "env",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(service_wall:status{app=\"$app\",service=\"$service\"}, env)"
+      },
+      {
+        "name": "version",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(service_wall:status{app=\"$app\",service=\"$service\",env=\"$env\"}, version)"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "STATUS",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "service_wall:status{app=\"$app\",service=\"$service\",env=\"$env\",version=\"$version\"}"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "CPU %",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "service_wall:cpu_pct{app=\"$app\",service=\"$service\",env=\"$env\",version=\"$version\"}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Memory %",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "service_wall:mem_pct{app=\"$app\",service=\"$service\",env=\"$env\",version=\"$version\"}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Disk Free %",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "service_wall:disk_free_pct{app=\"$app\",service=\"$service\",env=\"$env\",version=\"$version\"}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    }
+  ]
+}

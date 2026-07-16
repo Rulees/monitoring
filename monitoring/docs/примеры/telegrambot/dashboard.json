@@ -1,0 +1,197 @@
+{
+  "uid": "lotsmen-admin-final",
+  "title": "service_telegrambot",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": { "from": "now-24h", "to": "now" },
+
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "loki",
+        "refresh": 1
+      }
+    ]
+  },
+
+  "panels": [
+
+    {
+      "type": "row",
+      "title": "ОСНОВНЫЕ ПОКАЗАТЕЛИ",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+
+    {
+      "type": "stat",
+      "title": "• Всего пользователей:",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "instant": true,
+          "expr": "count(sum by (user_id)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|user_id!=\"\"[30d])))"
+        }
+      ]
+    },
+
+    {
+      "type": "stat",
+      "title": "• Активных сегодня:",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "instant": true,
+          "expr": "count(sum by (user_id)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|user_id!=\"\"[24h])))"
+        }
+      ]
+    },
+
+    {
+      "type": "stat",
+      "title": "• Всего Новичков сегодня:",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "instant": true,
+          "expr": "count(sum by (user_id)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|event=~\"start_command|start_from_site\"[24h])))"
+        }
+      ]
+    },
+
+    {
+      "type": "stat",
+      "title": "• Поисковых запросов:",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "instant": true,
+          "expr": "sum(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|event=\"estate_search\"[24h]))"
+        }
+      ]
+    },
+
+    {
+      "type": "stat",
+      "title": "• % кто сделал что-то:",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "targets": [
+        {
+          "instant": true,
+          "expr": "(count(sum by(user_id)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|event=\"estate_search\"[24h]))) / count(sum by(user_id)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|user_id!=\"\"[24h]))))*100"
+        }
+      ]
+    },
+
+    {
+      "type": "stat",
+      "title": "• % Новых с сайта сегодня:",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "targets": [
+        {
+          "instant": true,
+          "expr": "(count(sum by(user_id)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|event=\"start_from_site\"[24h]))) / count(sum by(user_id)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|event=~\"start_command|start_from_site\"[24h]))))*100"
+        }
+      ]
+    },
+
+    {
+      "type": "row",
+      "title": "СПИСКИ ПОЛЬЗОВАТЕЛЕЙ",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }
+    },
+
+    {
+      "type": "table",
+      "title": "1) Все пользователи",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "{service=\"telegrambot\",job=\"docker\"} | json | user_id!=\"\" | line_format \"{{.user_id}}\" | dedup",
+          "refId": "A"
+        }
+  ],
+  "options": {
+    "showHeader": true
+  },
+  "fieldConfig": {
+    "defaults": {
+      "custom": {}
+    },
+        "overrides": []
+  }
+    },
+
+    {
+      "type": "table",
+      "title": "2) Новички сегодня",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 6 },
+      "targets": [
+        {
+          "instant": true,
+      "expr": "sum by (user_id, username)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|event=~\"start_command|start_from_site\"[24h]))",
+      "refId": "A"
+    }
+  ],
+  "transformations": [
+    {
+      "id": "organize",
+      "options": {
+        "excludeByName": {
+          "Value": true
+        }
+      }
+        }
+      ]
+    },
+
+    {
+      "type": "table",
+      "title": "3) Активные сегодня",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 6 },
+      "targets": [
+        {
+          "instant": true,
+          "expr": "sum by (user_id, username)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|user_id!=\"\"[24h]))"
+        }
+      ]
+    },
+
+    {
+      "type": "row",
+      "title": "ПОПУЛЯРНОСТЬ ОБЪЕКТОВ",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
+    },
+
+    {
+      "type": "barchart",
+      "title": "Все запросы по ЖК",
+      "datasource": { "type": "loki", "uid": "$datasource" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sort_desc(sum by (estate_id)(count_over_time({service=\"telegrambot\",job=\"docker\"}|json|event=\"estate_search\"[24h])))",
+"instant": true
+        }
+      ],
+      "options": { "orientation": "horizontal" }
+    }
+
+  ]
+}

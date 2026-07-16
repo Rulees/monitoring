@@ -1,0 +1,98 @@
+- name: Prevent locks(работает иногда)
+  block:
+      - name: Останавливаем unattended-upgrades, чтобы он не держал локи
+        systemd:
+          name: unattended-upgrades
+          state: stopped
+          enabled: no
+        ignore_errors: true
+        become: yes
+
+# - name: Prevent locks(в яндекс облаке срабатывает всегда, а на других хостингах может ломать)
+#   block:
+#       - name: Wait for apt lock to be released
+#         shell: |
+#           for i in {1..12}; do
+#             fuser /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1 || break
+#             echo "Waiting for apt/dpkg lock to be released..."
+#             sleep 2
+#           done
+#         changed_when: false
+
+#       - name: Remove apt/dpkg lock files
+#         shell: rm -f /var/lib/dpkg/lock* /var/lib/apt/lists/lock* /var/cache/apt/archives/lock*
+#         ignore_errors: yes
+#         changed_when: false
+
+#       - name: Disable unattended upgrades (minimal safe version)
+#         shell: |
+#           systemctl disable --now unattended-upgrades.service || true
+#           systemctl mask unattended-upgrades.service || true
+#           rm -f /etc/apt/apt.conf.d/20auto-upgrades /etc/apt/apt.conf.d/50unattended-upgrades
+#         become: true
+
+
+- name: Check if Docker is already installed
+  command: docker --version
+  register: docker_installed
+  ignore_errors: yes
+  changed_when: false
+
+
+- name: Install Docker
+  block:
+      - name: Установить Docker (Ubuntu)
+        apt:
+          name: docker.io
+          state: present
+          update_cache: yes
+        retries: 7
+        delay: 5
+        register: result
+        until: result is succeeded
+        when:
+          - ansible_facts['os_family'] == "Debian"
+          - docker_installed.rc != 0
+        
+
+      - name: Установить Docker (Fedora)
+        dnf:
+          name: docker
+          state: present
+        retries: 5
+        delay: 5
+        register: result
+        until: result is succeeded
+        when: 
+          - ansible_facts['os_family'] == "RedHat"
+          - docker_installed.rc != 0
+
+
+- name: Launch Docker
+  block:
+      - name: Запустить Docker (Debian)
+        systemd:
+          name: docker
+          state: started
+          enabled: yes
+        when: ansible_os_family == "Debian"
+
+      - name: Запустить Docker (RedHat)
+        service:
+          name: docker
+          state: started
+          enabled: yes
+        when: ansible_os_family == "RedHat"
+
+- name: Убедиться, что группа 'docker' существует
+  group:
+    name: docker
+    state: present
+    system: true
+  when: docker_installed.rc == 0
+
+- name: Добавить пользователя в группу Docker
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes

@@ -1,0 +1,482 @@
+---
+- name: Limit system journal by size
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    regexp: '^#?SystemMaxUse='
+    line: 'SystemMaxUse=500M'
+  notify: Restart journald
+
+
+- name: Grafana
+  when: "enable_grafana | default(false)"
+  block:
+      - name: Create Grafana directories
+        file:
+          path: "{{ item.path }}"
+          state: directory
+          owner: "{{ item.owner }}"
+          group: "{{ item.group }}"
+          mode: "{{ item.mode }}"
+        loop:
+          - { path: /etc/grafana/provisioning/datasources, owner: root, group: root, mode: '0755' }
+          - { path: /etc/grafana/provisioning/dashboards, owner: root, group: root, mode: '0755' }
+          - { path: /etc/grafana/dashboards, owner: root, group: root, mode: '0755' }
+          - { path: /etc/grafana/plugins, owner: "472", group: "472", mode: '0755' }
+      
+      - name: Copy Grafana config files to remote host
+        copy:
+          src: "{{ item.src }}"
+          dest: "{{ item.dest }}"
+          force: true
+          owner: root
+          group: root
+          mode: '0644'
+        loop:
+          - { src: "{{ monitoring_config_dir }}/40-frontend/grafana.yml", dest: "/etc/grafana/provisioning/datasources/grafana.yml" }
+          - { src: "{{ monitoring_config_dir }}/40-frontend/grafana.ini", dest: "/etc/grafana/grafana.ini" }
+          - { src: "{{ monitoring_config_dir }}/40-frontend/provider.yml", dest: "/etc/grafana/provisioning/dashboards/provider.yml" }
+          # - { src: "{{ monitoring_config_dir }}/40-frontend/plugins", dest: "/etc/grafana/plugins" }
+
+
+      - name: Copy Grafana dashboards to remote server. + Adapt custom engineering paths/names to native Grafana paths/names.
+        block:
+            - name: Find Dashboards
+              find:
+                paths: "{{ monitoring_config_dir }}/{{ item.src }}"
+                patterns: "*.json"
+                recurse: yes
+              loop:
+                - { src: "global/dashboards", dest: "/etc/grafana/dashboards", type: "global" }            # "global/dashboards/cpu_mem.json" -> "cpu_mem.json"
+                - { src: "projects",          dest: "/etc/grafana/dashboards", type: "service_dashboard" } # "services/redis/dashboard.json"  -> "service_redis.json"
+              register: grafana_artifacts
+              delegate_to: localhost
+
+            - name: Copy and rename dashboards dynamically
+              vars:
+                name_patterns:
+                  global:            "{{ item.1.path | basename }}"
+                  service_dashboard: "{{ item.1.path | dirname | dirname | basename }}_{{ item.1.path | dirname | basename }}.json"
+              copy:
+                src: "{{ item.1.path }}"
+                dest: "{{ item.0.item.dest }}/{{ name_patterns[item.0.item.type] }}"
+                owner: root
+                group: root
+                mode: '0644'
+              loop: "{{ grafana_artifacts.results | default([]) | subelements('files', skip_missing=True) }}"
+
+
+      - name: Run Grafana Docker container
+        docker_container:
+          name: grafana
+          image: grafana/grafana
+          state: started
+          restart_policy: always
+          recreate: yes
+          env:
+            GF_PATHS_PLUGINS: /etc/grafana/plugins
+            GF_SECURITY_ADMIN_USER: "{{ GRAFANA_ADMIN_USER }}"
+            GF_SECURITY_ADMIN_PASSWORD: "{{ GRAFANA_ADMIN_PASSWORD }}"
+          ports:
+            - "3000:3000"
+          volumes:
+            - /etc/grafana:/etc/grafana
+          network_mode: host
+          # log_driver: "{{ docker_log_config.log_driver }}"
+          # log_options: "{{ docker_log_config.log_options }}"
+        register: result
+        until: result is succeeded
+        retries: 1
+        delay: 3
+
+
+
+- name: Wait for grafana be accessible [grafana 3000 port]
+  uri:
+    url: "http://{{ MONITORING_SERVER_IP }}:3000/api/health"
+    method: GET
+  register: grafana_health
+  until: grafana_health.status == 200 and grafana_health.json != ""
+  retries: 130 
+  delay: 5
+  when: MONITORING_SERVER_IP | default('') != ''
+
+
+
+- name: Loki
+  when: enable_loki | default(false)
+  block:
+      - name: Create /etc/loki directory
+        file:
+          path: /etc/loki
+          state: directory
+          owner: root
+          group: root
+          mode: '0755'
+
+      - name: Copy Loki config file to remote host
+        copy:
+          src: "{{ monitoring_config_dir }}/30-databases/loki.yml"
+          dest: /etc/loki/loki.yml
+          force: true
+          owner: root
+          group: root
+          mode: '0644'
+
+      - name: Run Loki Docker container
+        docker_container:
+          name: loki
+          image: grafana/loki
+          state: started
+          restart_policy: always
+          recreate: yes
+          user: "0:0"
+          ports:
+            - "3100:3100"
+          volumes:
+            - /etc/loki/loki.yml:/etc/loki/loki.yml
+            - /var/lib/loki/chunks:/loki/chunks
+          command:
+            - '--config.file=/etc/loki/loki.yml'
+          network_mode: host
+          # log_driver: "{{ docker_log_config.log_driver }}"
+          # log_options: "{{ docker_log_config.log_options }}"
+
+
+- name: Promtail
+  when: enable_promtail | default(false)
+  block:
+
+      - name: Create /etc/promtail directory
+        file:
+          path: /etc/promtail
+          state: directory
+          owner: root
+          group: root
+          mode: '0755'
+      
+      
+      - name: Template Promtail config file to remote host
+        template:
+          src: "{{ monitoring_config_dir }}/20-collectors/promtail.yml.j2"
+          dest: /etc/promtail/promtail.yml
+          force: true
+          owner: root
+          group: root
+          mode: '0644'
+
+      - name: Run Promtail Docker container
+        docker_container:
+          name: promtail
+          image: grafana/promtail
+          state: started
+          restart_policy: always
+          recreate: yes
+          ports:
+            - "9080:9080"
+          volumes:
+            - /etc/promtail/promtail.yml:/etc/promtail/promtail.yml     # this is only needed if you are going to send syslogs
+            - /var/log:/var/log                                         # get access to system logs
+            - /var/lib/docker/containers:/var/lib/docker/containers     # docker logs
+            - /etc/promtail/GeoLite2-City.mmdb:/etc/promtail/GeoLite2-City.mmdb
+          command:
+            - '--config.file=/etc/promtail/promtail.yml'
+          network_mode: host
+          # dns_servers:
+          #   - 127.0.0.1
+          #   - 8.8.8.8
+
+          # log_driver: "{{ docker_log_config.log_driver }}"
+          # log_options: "{{ docker_log_config.log_options }}"
+          
+
+
+- name: Run Node Exporter Docker container
+  when: enable_node_exporter | default(false)
+  docker_container:
+    name: node_exporter
+    image: prom/node-exporter
+    state: started
+    restart_policy: always
+    recreate: yes
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/host/root'
+    network_mode: host
+    # dns_servers:
+    #         - 127.0.0.1
+    #         - 8.8.8.8
+
+    # log_driver: "{{ docker_log_config.log_driver }}"
+    # log_options: "{{ docker_log_config.log_options }}"
+
+
+
+
+- name: Prometheus
+  when: enable_prometheus | default(false)
+  block:
+      - name: Create Prometheus directories (Config, Rules, Data)
+        file:
+          path: "{{ item.path }}"
+          state: directory
+          owner: "{{ item.owner }}"
+          group: "{{ item.group }}"
+          mode: '0755'
+        loop:
+          - { path: '/etc/prometheus', owner: 'root', group: 'root' }
+          - { path: '/etc/prometheus/rules', owner: 'root', group: 'root' }
+          - { path: '/prometheus/data', owner: '65534', group: '65534' }
+
+      # this is requred by prometheus, even if this is empty (/etc/prometheus/rules.yml, /etc/prometheus/prometheus.yml)
+      - name: Copy Prometheus config file to remote host
+        copy:
+          src: '{{ monitoring_config_dir }}/30-databases/prometheus.yml'
+          dest: '/etc/prometheus/prometheus.yml'
+          force: true
+          owner: root
+          group: root
+          mode: '0644'
+
+      - name: Copy Prometheus Rules, Alerts to remote server. + Adapt custom engineering paths/names to native Prometheus paths/names.
+        block:
+            - name: Find Rules and Alerts
+              find:
+                paths: "{{ monitoring_config_dir }}/{{ item.src }}"
+                patterns: "*.rules.yml,*.alerts.yml"
+                recurse: yes
+              delegate_to: localhost
+              loop:
+                - { src: "global",   dest: "/etc/prometheus/rules",  type: "global" }                # "/global/alerts/infra.alerts.yml" -> "infra.alerts.yml"
+                - { src: "projects", dest: "/etc/prometheus/rules",  type: "service_rule" }          # "projects/asepta/nginx/rules.yml"       -> "asepta_nginx.rules.yml"
+              register: prometheus_artifacts
+              
+
+            - name: Copy and rename rules dynamically
+              vars:
+                name_patterns:
+                  global:       "{{ item.1.path | basename }}"
+                  service_rule: "{{ item.1.path | dirname | dirname | basename }}_{{ item.1.path | dirname | basename }}.{{ item.1.path | basename }}"
+              copy:
+                src: "{{ item.1.path }}"
+                dest: "{{ item.0.item.dest }}/{{ name_patterns[item.0.item.type] }}"
+                owner: root
+                group: root
+                mode: '0644'
+              loop: "{{ prometheus_artifacts.results | default([]) | subelements('files', skip_missing=True) }}"
+
+      - name: Run Prometheus Docker container
+        docker_container:
+          name: prometheus
+          image: prom/prometheus
+          state: started
+          restart_policy: always
+          recreate: yes
+          ports:
+            - "9090:9090"
+          volumes:
+            - /etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+            # - /prometheus:/prometheus/
+            - /etc/prometheus/rules:/etc/prometheus/rules
+            - /prometheus/data:/prometheus
+          command:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--web.enable-remote-write-receiver'
+          network_mode: host
+          # log_driver: "{{ docker_log_config.log_driver }}"
+          # log_options: "{{ docker_log_config.log_options }}"
+          
+
+
+- name: cAdvisor
+  when: enable_cadvisor | default(false)
+  block:
+      - name: Run cAdvisor Docker container
+        docker_container:
+          name: cadvisor
+          image: gcr.io/cadvisor/cadvisor
+          state: started
+          restart_policy: always
+          recreate: yes
+          ports:
+            - "8080:8080"
+          volumes:
+            - /:/rootfs:ro
+            - /var/run:/var/run:ro
+            - /sys:/sys:ro
+            - /var/lib/docker:/var/lib/docker:ro
+          command:
+            - "--housekeeping_interval=10s"
+            - "--docker_only=true"
+          network_mode: host
+          # dns_servers:
+          #   - 127.0.0.1
+          #   - 8.8.8.8
+
+          # log_driver: "{{ docker_log_config.log_driver }}"
+          # log_options: "{{ docker_log_config.log_options }}"
+
+
+- name: Blackbox Exporter
+  when: enable_blackbox_exporter | default(false)
+  block:
+      - name: Create blackbox_exporter directory
+        file:
+          path: "/etc/blackbox_exporter"
+          state: directory
+          owner: root
+          group: root
+          mode: "0755"
+
+      - name: Copy Blackbox config file to remote host
+        copy:
+          src: "{{ monitoring_config_dir }}/10-exporters/blackbox.yml"
+          dest: "/etc/blackbox_exporter/blackbox.yml"
+          owner: root
+          group: root
+          mode: "0644"
+
+      - name: Run Blackbox Exporter Docker container
+        docker_container:
+          name: blackbox_exporter
+          image: prom/blackbox-exporter:v0.25.0
+          state: started
+          restart_policy: always
+          recreate: yes
+          ports:
+            - "9115:9115"
+          volumes:
+            - /etc/blackbox_exporter/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+          network_mode: host
+          # dns_servers:
+          #   - 127.0.0.1
+          #   - 8.8.8.8
+
+          # log_driver: "{{ docker_log_config.log_driver }}"
+          # log_options: "{{ docker_log_config.log_options }}"
+
+
+- name: Domain Exporter
+  when: enable_domain_exporter | default(false)
+  block:
+      - name: Create domain_exporter directory
+        file:
+          path: "/etc/domain_exporter"
+          state: directory
+          owner: root
+          group: root
+          mode: "0755"
+
+      - name: Copy Domain config file to remote host
+        copy:
+          src: "{{ monitoring_config_dir }}/10-exporters/domains.yml"
+          dest: "/etc/domain_exporter/domains.yml"
+          owner: root
+          group: root
+          mode: "0644"
+
+      - name: Run Domain Exporter Docker container
+        docker_container:
+          name: domain_exporter
+          image: caarlos0/domain_exporter:v1.18.0 # higher version could be specially broken for .ru and russia
+          state: started
+          restart_policy: always
+          recreate: yes
+          ports:
+            - "9222:9222"
+          volumes:
+            - /etc/domain_exporter/domains.yml:/etc/domain_exporter/domains.yml:ro
+          command:
+            - '--config=/etc/domain_exporter/domains.yml'
+          network_mode: host
+          # dns_servers:
+          #   - 127.0.0.1
+          #   - 8.8.8.8
+
+          # log_driver: "{{ docker_log_config.log_driver }}"
+          # log_options: "{{ docker_log_config.log_options }}"
+
+
+
+- name: Alertmanager
+  when: enable_alertmanager | default(false)
+  block:
+      - name: Create Alertmanager directories
+        file:
+          path: "{{ item }}"
+          state: directory
+          owner: root
+          group: root
+          mode: '0755'
+        loop:
+          - /etc/alertmanager
+          - /etc/alertmanager/templates
+
+      - name: Copy Alertmanager config files and templates to remote host
+        copy:
+          src: "{{ item.src }}"
+          dest: "{{ item.dest }}"
+          force: true
+          owner: root
+          group: root
+          mode: '0644'
+        loop:
+          - { src: "{{ monitoring_config_dir }}/30-databases/alertmanager.yml", dest: /etc/alertmanager/alertmanager.yml }
+          - { src: "{{ monitoring_config_dir }}/30-databases/alertmanager-templates/", dest: /etc/alertmanager/templates/ }
+
+
+      - name: Run Alertmanager Docker container
+        docker_container:
+          name: alertmanager
+          image: prom/alertmanager:v0.31.0 # latest version that compatible with carma
+          state: started
+          restart_policy: always
+          recreate: yes
+          ports:
+            - "9093:9093"
+          volumes:
+            - /etc/alertmanager:/etc/alertmanager
+          network_mode: host
+
+
+
+- name: Karma Alert Dashboard
+  when: enable_karma | default(false)
+  block:
+      - name: Create Karma configuration directory
+        file:
+          path: /etc/karma
+          state: directory
+          owner: root
+          group: root
+          mode: '0755'
+
+      - name: Copy Karma config file to remote host
+        copy:
+          src: "{{ monitoring_config_dir }}/40-frontend/karma.yml"
+          dest: /etc/karma/karma.yml
+          force: true
+          owner: root
+          group: root
+          mode: '0644'
+
+      - name: Run Karma Docker container
+        docker_container:
+          name: karma
+          image: ghcr.io/prymitive/karma:v0.131
+          state: started
+          restart_policy: always
+          recreate: yes
+          env:
+            CONFIG_FILE: /karma.yml
+          ports:
+            - "8080:8080" # По умолчанию работает на 8080 порту
+          volumes:
+            - /etc/karma/karma.yml:/karma.yml
+          network_mode: host

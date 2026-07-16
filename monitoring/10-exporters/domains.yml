@@ -1,0 +1,9 @@
+# domain_probe_success
+# domain_probe_duration_seconds
+# domain_expiry_days
+
+
+domains:
+  - lotsmen.ru
+  - asepta.ru
+  - cmb.ru

@@ -1,0 +1,39 @@
+- name: Create directory for VPN secrets
+  file:
+    path: "/etc/amnezia/amneziawg"
+    state: directory
+    mode: '0700'
+
+- name: SEND SECRETS
+  no_log: true
+  block:
+      - name: CUSTOM
+        block:
+                  - name: Upload vpn config to remote host
+                    copy:
+                      content: "{{ vpn_secret_config_content }}"
+                      dest: "/etc/amnezia/amneziawg/awg0.conf"
+                      mode: '0600'
+                      force: true
+
+
+- name: Setup AmneziaWG VPN for Telegram routing
+  block:
+    - name: Add AmneziaWG PPA
+      apt_repository:
+        repo: ppa:amnezia/ppa
+        state: present
+        update_cache: yes
+
+    - name: Install AmneziaWG packages
+      apt:
+        name:
+          - amneziawg
+          - amneziawg-tools
+        state: latest
+
+    - name: Enable and start AmneziaWG service
+      systemd:
+        name: awg-quick@awg0
+        enabled: yes
+        state: restarted
