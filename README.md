@@ -26,11 +26,15 @@ ansible-vault encrypt_string 'gwrgwrg' --name 'GRAFANA_ADMIN_PASSWORD'
 
 ### Запуск MONITORING_SERVER
 ```
-ansible-playbook monitoring/projects/monitoring_server/playbook.yml --inventory=monitoring/projects/monitoring_server/inventory.yml -vv --inventory=ansible/inventory/
+ansible-playbook monitoring/projects/monitoring_server/playbook.yml
+    --inventory=monitoring/projects/monitoring_server/inventory.yml
+    --inventory=ansible/inventory/
 ```
 
 
 ### Запуск MONITORING_CLIENT (тестовый проект [test])
 ```
-ansible-playbook monitoring/projects/test/playbook.yml --inventory=monitoring/projects/test/inventory.yml -vv --inventory=ansible/inventory/
+ansible-playbook monitoring/projects/test/playbook.yml
+    --inventory=monitoring/projects/test/inventory.yml
+    --inventory=ansible/inventory/
 ```
