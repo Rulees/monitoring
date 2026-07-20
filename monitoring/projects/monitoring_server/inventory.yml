@@ -3,7 +3,7 @@ monitoring_server:
   hosts:
     monitoring_server:
       PROJECT_NAME: "monitoring_server"
-      ansible_host: 93.77.186.158
+      ansible_host: 111.88.243.102
       ansible_user: melnikov
       ansible_ssh_private_key_file: ~/.ssh/yc_ssh_key
       ansible_ssh_port: 22

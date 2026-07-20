@@ -23,7 +23,5 @@
               vars:
                             enable_promtail: true         # для логов
                             enable_node_exporter: true    # для метрик
-                            enable_blackbox_exporter: true  # https expire, ports check
-                            enable_domain_exporter: true    # domain expire
 
 
