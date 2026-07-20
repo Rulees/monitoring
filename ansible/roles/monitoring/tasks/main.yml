@@ -10,6 +10,11 @@
 - name: Grafana
   when: "enable_grafana | default(false)"
   block:
+      - name: Delete old Grafana dashboards
+        file:
+          path: /etc/grafana/dashboards
+          state: absent
+
       - name: Create Grafana directories
         file:
           path: "{{ item.path }}"
@@ -222,6 +227,11 @@
 - name: Prometheus
   when: enable_prometheus | default(false)
   block:
+      - name: Delete old Grafana dashboards
+        file:
+          path: /etc/prometheus/rules
+          state: absent
+
       - name: Create Prometheus directories (Config, Rules, Data)
         file:
           path: "{{ item.path }}"

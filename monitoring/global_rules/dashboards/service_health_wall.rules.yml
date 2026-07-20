@@ -1,29 +1,6 @@
-# sum by (role) (
-# (
-#   100 * (1 - ((avg_over_time(node_memory_MemFree_bytes[1m]) + avg_over_time(node_memory_Cached_bytes[1m]) + avg_over_time(node_memory_Buffers_bytes[1m])) / avg_over_time(node_memory_MemTotal_bytes[1m])))
-# )
-# * on(version) group_left(role) deploy_role_map{role="stable"}
-# > 10)
-
-
-# sum by (role) (
-# up{job="service_database"} 
-#   * on(version) group_left(role) deploy_role_map{role="canary"} 
-#   == 1)
-
-
-
-# sum by (role) (
-#   up{job="service_database"} 
-#     * on(version) group_left(role) deploy_role_map
-# )
-
-
 # service_wall.rules.yml
 # Assumptions:
-# - Labels: env, app, service, version
-# - env="prod": version="stable|canary"
-# - env="dev": version label отсутствует -> мы принудительно создаём version="dev"
+# - Labels: project_name
 # - node_exporter metrics present: node_cpu_seconds_total, node_memory_*, node_filesystem_*, up
 #
 # Severity scale:
@@ -39,99 +16,34 @@ groups:
 
       - record: service_wall:cpu_pct
         expr: |
-          (
-            max by (env, app, service, version) (
-              100 - (
-                avg by (env, app, service, version, instance) (
-                  rate(node_cpu_seconds_total{mode="idle", env="prod"}[5m])
-                ) * 100
-              )
-            )
-            * on(version) group_left(role)
-            (deploy_role_map{role=~"stable|canary"} == 1)
-          )
-          or
-          (
-            label_replace(
-              max by (env, app, service) (
-                100 - (
-                  avg by (env, app, service, instance) (
-                    rate(node_cpu_seconds_total{mode="idle", env="dev"}[5m])
-                  ) * 100
-                )
-              ),
-              "version", "dev", "env", "dev"
+          max by (project_name) (
+            100 - (
+              avg by (project_name, instance) (
+                rate(node_cpu_seconds_total{mode="idle"}[5m])
+              ) * 100
             )
           )
 
       - record: service_wall:mem_pct
         expr: |
-          (
-            max by (env, app, service, version) (
-              (1 - (node_memory_MemAvailable_bytes{env="prod"} / node_memory_MemTotal_bytes{env="prod"})) * 100
-            )
-            * on(version) group_left(role)
-            (deploy_role_map{role=~"stable|canary"} == 1)
-          )
-          or
-          (
-            label_replace(
-              max by (env, app, service) (
-                (1 - (node_memory_MemAvailable_bytes{env="dev"} / node_memory_MemTotal_bytes{env="dev"})) * 100
-              ),
-              "version", "dev", "env", "dev"
-            )
+          max by (project_name) (
+            (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
           )
 
       - record: service_wall:disk_free_pct
         expr: |
-          (
-            min by (env, app, service, version) (
-              (
-                node_filesystem_avail_bytes{env="prod", mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
-                /
-                node_filesystem_size_bytes{env="prod", mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
-              ) * 100
-            )
-            * on(version) group_left(role)
-            (deploy_role_map{role=~"stable|canary"} == 1)
-          )
-          or
-          (
-            label_replace(
-              min by (env, app, service) (
-                (
-                  node_filesystem_avail_bytes{env="dev", mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
-                  /
-                  node_filesystem_size_bytes{env="dev", mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
-                ) * 100
-              ),
-              "version", "dev", "env", "dev"
-            )
+          min by (project_name) (
+            (
+              node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
+              /
+              node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
+            ) * 100
           )
 
       # "Хоть один упал" => DOWN (берём min)
       - record: service_wall:up
         expr: |
-          (
-            min by (env, app, service, version) (up{env="prod"})
-            * on(version) group_left(role)
-            (deploy_role_map{role=~"stable|canary"} == 1)
-          )
-          or
-          (
-            label_replace(
-              min by (env, app, service) (up{env="dev"}),
-              "version", "dev", "env", "dev"
-            )
-          )
-
-      # Вес окружения: prod=3, dev=1 (не зависит от наличия canary/stable)
-      - record: service_wall:env_weight
-        expr: |
-          (service_wall:up{env="prod"} * 0 + 3)
-          or
-          (service_wall:up{env="dev"} * 0 + 1)
+          min by (project_name) (up)
 
       # -----------------------
       # SEVERITY per metric (1/2/3 + DOWN=4)
@@ -139,26 +51,26 @@ groups:
 
       - record: service_wall:sev_cpu
         expr: |
-          max by (env, app, service, version) (
+          max by (project_name) (
             1 + (service_wall:cpu_pct >= bool 70) + (service_wall:cpu_pct >= bool 85)
           )
 
       - record: service_wall:sev_mem
         expr: |
-          max by (env, app, service, version) (
+          max by (project_name) (
             1 + (service_wall:mem_pct >= bool 70) + (service_wall:mem_pct >= bool 85)
           )
 
       - record: service_wall:sev_disk
         expr: |
-          max by (env, app, service, version) (
+          max by (project_name) (
             1 + (service_wall:disk_free_pct < bool 20) + (service_wall:disk_free_pct < bool 10)
           )
 
       # DOWN overrides: up==0 -> 4, else 0
       - record: service_wall:sev_up
         expr: |
-          max by (env, app, service, version) (
+          max by (project_name) (
             (service_wall:up == bool 0) * 4
           )
 
@@ -168,19 +80,17 @@ groups:
 
       - record: service_wall:status
         expr: |
-          max by (env, app, service, version) (
+          max by (project_name) (
             service_wall:sev_cpu
             or service_wall:sev_mem
             or service_wall:sev_disk
             or service_wall:sev_up
           )
 
-      # effective для сортировки (prod важнее dev)
+      # effective для сортировки. Так как весов окружений (prod/dev) больше нет, просто дублируем status
       - record: service_wall:effective
         expr: |
-          max by (env, app, service, version) (
-            service_wall:status * service_wall:env_weight
-          )
+          service_wall:status
 
       # -----------------------
       # INSTANCE-level для N/BAD
@@ -188,104 +98,55 @@ groups:
 
       - record: service_wall:cpu_pct_i
         expr: |
-          (
-            100 * (1 - avg by (env, app, service, version, instance) (
-                rate(node_cpu_seconds_total{mode="idle", env="prod"}[5m])
-              ))
-            * on(version) group_left(role)
-            (deploy_role_map{role=~"stable|canary"} == 1)
-          )
-          or
-          (
-            label_replace(
-              100 * (1 - avg by (env, app, service, instance) (
-                  rate(node_cpu_seconds_total{mode="idle", env="dev"}[5m])
-                )),
-              "version", "dev", "env", "dev"
-            )
-          )
+          100 * (1 - avg by (project_name, instance) (
+            rate(node_cpu_seconds_total{mode="idle"}[5m])
+          ))
 
       - record: service_wall:mem_pct_i
         expr: |
-          (
-            ((1 - (node_memory_MemAvailable_bytes{env="prod"} / node_memory_MemTotal_bytes{env="prod"})) * 100)
-            * on(version) group_left(role)
-            (deploy_role_map{role=~"stable|canary"} == 1)
-          )
-          or
-          (
-            label_replace(
-              ((1 - (node_memory_MemAvailable_bytes{env="dev"} / node_memory_MemTotal_bytes{env="dev"})) * 100),
-              "version", "dev", "env", "dev"
-            )
-          )
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
 
       - record: service_wall:disk_free_pct_i
         expr: |
-          (
-            min by (env, app, service, version, instance) (
-              (
-                node_filesystem_avail_bytes{env="prod", mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
-                /
-                node_filesystem_size_bytes{env="prod", mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
-              ) * 100
-            )
-            * on(version) group_left(role)
-            (deploy_role_map{role=~"stable|canary"} == 1)
-          )
-          or
-          (
-            label_replace(
-              min by (env, app, service, instance) (
-                (
-                  node_filesystem_avail_bytes{env="dev", mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
-                  /
-                  node_filesystem_size_bytes{env="dev", mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
-                ) * 100
-              ),
-              "version", "dev", "env", "dev"
-            )
+          min by (project_name, instance) (
+            (
+              node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
+              /
+              node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay|squashfs"}
+            ) * 100
           )
 
       - record: service_wall:up_i
         expr: |
-          (
-            up{env="prod"}
-            * on(version) group_left(role)
-            (deploy_role_map{role=~"stable|canary"} == 1)
-          )
-          or
-          (
-            label_replace(up{env="dev"}, "version", "dev", "env", "dev")
-          )
+          up
 
       - record: service_wall:sev_cpu_i
         expr: |
-          max by (env, app, service, version, instance) (
+          max by (project_name, instance) (
             1 + (service_wall:cpu_pct_i >= bool 70) + (service_wall:cpu_pct_i >= bool 85)
           )
 
       - record: service_wall:sev_mem_i
         expr: |
-          max by (env, app, service, version, instance) (
+          max by (project_name, instance) (
             1 + (service_wall:mem_pct_i >= bool 70) + (service_wall:mem_pct_i >= bool 85)
           )
 
       - record: service_wall:sev_disk_i
         expr: |
-          max by (env, app, service, version, instance) (
+          max by (project_name, instance) (
             1 + (service_wall:disk_free_pct_i < bool 20) + (service_wall:disk_free_pct_i < bool 10)
           )
 
       - record: service_wall:sev_up_i
         expr: |
-          max by (env, app, service, version, instance) (
+          max by (project_name, instance) (
             (service_wall:up_i == bool 0) * 4
           )
 
       - record: service_wall:status_i
         expr: |
-          max by (env, app, service, version, instance) (
+          max by (project_name, instance) (
             service_wall:sev_cpu_i
             or service_wall:sev_mem_i
             or service_wall:sev_disk_i
@@ -295,9 +156,9 @@ groups:
       # N = сколько инстансов всего
       - record: service_wall:n
         expr: |
-          count by (env, app, service, version) (service_wall:up_i)
+          count by (project_name) (service_wall:up_i)
 
       # BAD = сколько инстансов где status>=2 (WARN/CRIT/DOWN)
       - record: service_wall:bad
         expr: |
-          sum by (env, app, service, version) (service_wall:status_i >= bool 2)
+          sum by (project_name) (service_wall:status_i >= bool 2)

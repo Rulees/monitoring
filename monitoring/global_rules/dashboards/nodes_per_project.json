@@ -269,22 +269,22 @@
       "pluginVersion": "12.3.3",
       "targets": [
         {
-          "expr": "label_join(service_wall:cpu_pct_i{env=~\"$env\", app=~\"$app\", service=~\"$service\", version=~\"$version\"}, \"INSTANCE\", \"\", \"instance\")",
+          "expr": "label_join(service_wall:cpu_pct_i{project_name=~\"$project_name\", version=~\"$version\"}, \"INSTANCE\", \"\", \"instance\")",
           "instant": true,
           "refId": "A"
         },
         {
-          "expr": "label_join(service_wall:mem_pct_i{env=~\"$env\", app=~\"$app\", service=~\"$service\", version=~\"$version\"}, \"INSTANCE\", \"\", \"instance\")",
+          "expr": "label_join(service_wall:mem_pct_i{project_name=~\"$project_name\", version=~\"$version\"}, \"INSTANCE\", \"\", \"instance\")",
           "instant": true,
           "refId": "B"
         },
         {
-          "expr": "label_join(service_wall:disk_free_pct_i{env=~\"$env\", app=~\"$app\", service=~\"$service\", version=~\"$version\"}, \"INSTANCE\", \"\", \"instance\")",
+          "expr": "label_join(service_wall:disk_free_pct_i{project_name=~\"$project_name\", version=~\"$version\"}, \"INSTANCE\", \"\", \"instance\")",
           "instant": true,
           "refId": "C"
         },
         {
-          "expr": "label_join(service_wall:status_i{env=~\"$env\", app=~\"$app\", service=~\"$service\", version=~\"$version\"}, \"INSTANCE\", \"\", \"instance\")",
+          "expr": "label_join(service_wall:status_i{project_name=~\"$project_name\", version=~\"$version\"}, \"INSTANCE\", \"\", \"instance\")",
           "instant": true,
           "refId": "D"
         }
@@ -354,29 +354,11 @@
     "list": [
       {
         "current": {
-          "text": "dev",
-          "value": "dev"
+          "text": "my_project",
+          "value": "my_project"
         },
-        "name": "env",
-        "query": "dev",
-        "type": "textbox"
-      },
-      {
-        "current": {
-          "text": "home",
-          "value": "home"
-        },
-        "name": "app",
-        "query": "home",
-        "type": "textbox"
-      },
-      {
-        "current": {
-          "text": "telegrambot",
-          "value": "telegrambot"
-        },
-        "name": "service",
-        "query": "telegrambot",
+        "name": "project_name",
+        "query": "my_project",
         "type": "textbox"
       },
       {

@@ -8,28 +8,16 @@
   "templating": {
     "list": [
       {
-        "name": "app",
+        "name": "project_name",
         "type": "query",
         "datasource": "Prometheus",
-        "query": "label_values(service_wall:status, app)"
-      },
-      {
-        "name": "service",
-        "type": "query",
-        "datasource": "Prometheus",
-        "query": "label_values(service_wall:status{app=\"$app\"}, service)"
-      },
-      {
-        "name": "env",
-        "type": "query",
-        "datasource": "Prometheus",
-        "query": "label_values(service_wall:status{app=\"$app\",service=\"$service\"}, env)"
+        "query": "label_values(service_wall:status, project_name)"
       },
       {
         "name": "version",
         "type": "query",
         "datasource": "Prometheus",
-        "query": "label_values(service_wall:status{app=\"$app\",service=\"$service\",env=\"$env\"}, version)"
+        "query": "label_values(service_wall:status{project_name=\"$project_name\"}, version)"
       }
     ]
   },
@@ -44,7 +32,7 @@
         {
           "refId": "A",
           "instant": true,
-          "expr": "service_wall:status{app=\"$app\",service=\"$service\",env=\"$env\",version=\"$version\"}"
+          "expr": "service_wall:status{project_name=\"$project_name\",version=\"$version\"}"
         }
       ],
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
@@ -58,7 +46,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "service_wall:cpu_pct{app=\"$app\",service=\"$service\",env=\"$env\",version=\"$version\"}"
+          "expr": "service_wall:cpu_pct{project_name=\"$project_name\",version=\"$version\"}"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "percent" } }
@@ -72,7 +60,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "service_wall:mem_pct{app=\"$app\",service=\"$service\",env=\"$env\",version=\"$version\"}"
+          "expr": "service_wall:mem_pct{project_name=\"$project_name\",version=\"$version\"}"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "percent" } }
@@ -86,7 +74,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "service_wall:disk_free_pct{app=\"$app\",service=\"$service\",env=\"$env\",version=\"$version\"}"
+          "expr": "service_wall:disk_free_pct{project_name=\"$project_name\",version=\"$version\"}"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "percent" } }

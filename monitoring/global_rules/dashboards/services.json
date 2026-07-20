@@ -17,37 +17,37 @@
         {
           "refId": "A",
           "instant": true,
-          "expr": "label_join(label_join(service_wall:cpu_pct, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+          "expr": "service_wall:cpu_pct"
         },
         {
           "refId": "B",
           "instant": true,
-          "expr": "label_join(label_join(service_wall:mem_pct, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+          "expr": "service_wall:mem_pct"
         },
         {
           "refId": "C",
           "instant": true,
-          "expr": "label_join(label_join(service_wall:disk_free_pct, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+          "expr": "service_wall:disk_free_pct"
         },
         {
           "refId": "D",
           "instant": true,
-          "expr": "label_join(label_join(service_wall:status, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+          "expr": "service_wall:status"
         },
         {
           "refId": "E",
           "instant": true,
-          "expr": "label_join(label_join(service_wall:effective, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+          "expr": "service_wall:effective"
         },
         {
           "refId": "F",
           "instant": true,
-          "expr": "label_join(label_join(service_wall:n, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+          "expr": "service_wall:n"
         },
         {
           "refId": "G",
           "instant": true,
-          "expr": "label_join(label_join(service_wall:bad, \"ENV__APP__SERVICE\", \"__\", \"env\", \"app\", \"service\"), \"ENV__APP__SERVICE---VERSION\", \"---\", \"ENV__APP__SERVICE\", \"version\")"
+          "expr": "service_wall:bad"
         }
       ],
 
@@ -55,7 +55,7 @@
         {
           "id": "joinByLabels",
           "options": {
-            "join": ["ENV__APP__SERVICE---VERSION"],
+            "join": ["project_name"],
             "value": "__name__"
           }
         },
@@ -70,7 +70,8 @@
               "service_wall:status": "S",
               "service_wall:effective": "EFFECTIVE",
               "service_wall:n": "N",
-              "service_wall:bad": "BAD"
+              "service_wall:bad": "BAD",
+              "project_name": "PROJECT"
             }
           }
         },
@@ -79,7 +80,7 @@
           "id": "sortBy",
           "options": {
             "sort": [
-              { "field": "ENV__APP__SERVICE---VERSION", "desc": false },
+              { "field": "PROJECT", "desc": false },
               { "field": "EFFECTIVE", "desc": true }
             ]
           }
@@ -91,12 +92,11 @@
             "excludeByName": {
               "__name__": true,
               "Time": true,
-              "ENV__APP__SERVICE": true,
               "EFFECTIVE": true
             },
             "indexByName": {
               "S": 0,
-              "ENV__APP__SERVICE---VERSION": 1,
+              "PROJECT": 1,
               "CPU": 2,
               "MEM": 3,
               "DISK": 4,
@@ -151,7 +151,7 @@
           },
 
           {
-            "matcher": { "id": "byName", "options": "ENV__APP__SERVICE---VERSION" },
+            "matcher": { "id": "byName", "options": "PROJECT" },
             "properties": [
               { "id": "custom.width", "value": 520 },
               { "id": "custom.cellOptions", "value": { "type": "auto" } }
