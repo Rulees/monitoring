@@ -15,11 +15,11 @@ route:
 
 
 receivers:
-  - name: 'slack'
-    slack_configs:
-      - api_url: ''  # Slack Webhook URL
-        channel: '#all-arkselen'
-        send_resolved: true
+  # - name: 'slack'
+  #   slack_configs:
+  #     - api_url: ''  # Slack Webhook URL
+  #       channel: '#all-arkselen'
+  #       send_resolved: true
 
   - name: email
     email_configs:
